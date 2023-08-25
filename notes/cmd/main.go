@@ -14,6 +14,7 @@ func main() {
 	}
 }
 func run() error {
+	//todo create file with sql queries (automigration, migration), get rid off name of function in url
 	config, err := configs.InitConfigs()
 	if err != nil {
 		return err

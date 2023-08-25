@@ -14,12 +14,13 @@ import (
 	"time"
 )
 
+// todo we need to close connection with db after closing the app
 func Create(response http.ResponseWriter, request *http.Request) {
 	dbUri := "host=localhost port = 5432 user = app password = pass dbname = db"
 	db, err := gorm.Open(postgres.Open(dbUri), &gorm.Config{}) //installs connection with database
 	if err != nil {
 		log.Println(err)
-		response.WriteHeader(http.StatusInternalServerError) //todo
+		response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	var note models.Notes
@@ -46,12 +47,12 @@ func Create(response http.ResponseWriter, request *http.Request) {
 	}
 	response.Write([]byte("Success"))
 }
-func Read(response http.ResponseWriter, request *http.Request) {
+func Read(response http.ResponseWriter, request *http.Request) { //todo make a list of all the notes
 	dbUri := "host=localhost port = 5432 user = app password = pass dbname = db"
 	db, err := gorm.Open(postgres.Open(dbUri), &gorm.Config{}) //installs connection with database
 	if err != nil {
 		log.Println(err)
-		response.WriteHeader(http.StatusInternalServerError) //todo
+		response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	vars := mux.Vars(request)
@@ -59,7 +60,7 @@ func Read(response http.ResponseWriter, request *http.Request) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		log.Println(err)
-		response.WriteHeader(http.StatusInternalServerError)
+		response.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	sqlQuery := `select * from notes where id = ? and active = true`
@@ -93,7 +94,7 @@ func Update(response http.ResponseWriter, request *http.Request) {
 	db, err := gorm.Open(postgres.Open(dbUri), &gorm.Config{}) //installs connection with database
 	if err != nil {
 		log.Println(err)
-		response.WriteHeader(http.StatusInternalServerError) //todo
+		response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	vars := mux.Vars(request)
@@ -101,7 +102,7 @@ func Update(response http.ResponseWriter, request *http.Request) {
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		log.Println(err)
-		response.WriteHeader(http.StatusInternalServerError) //todo
+		response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	bytes, err := io.ReadAll(request.Body)
@@ -114,14 +115,27 @@ func Update(response http.ResponseWriter, request *http.Request) {
 	err = json.Unmarshal(bytes, &updatedNote)
 	if err != nil {
 		log.Println(err)
-		response.WriteHeader(http.StatusInternalServerError) //todo
+		response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	sqlQuery := `update notes set content = ? where id = ?`
-	err = db.Exec(sqlQuery, updatedNote.Content, id).Error
+	sqlQuery := `update notes set content = ?, updated_at = ? where id = ? and active = true`
+	var check models.Notes
+	err = db.Exec(sqlQuery, updatedNote.Content, time.Now(), id).Error
 	if err != nil {
 		log.Println(err)
-		response.WriteHeader(http.StatusInternalServerError) //todo
+		response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	sqlQuery = `select * from notes where id = ? and active = true`
+	err = db.Raw(sqlQuery, id).Scan(&check).Error
+	log.Println(check)
+	if err != nil {
+		log.Println(err)
+		response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if check.Content == "" {
+		response.Write([]byte("There is not such note!"))
 		return
 	}
 	response.Write([]byte("Success"))
@@ -131,7 +145,7 @@ func Delete(response http.ResponseWriter, request *http.Request) {
 	db, err := gorm.Open(postgres.Open(dbUri), &gorm.Config{}) //installs connection with database
 	if err != nil {
 		log.Println(err)
-		response.WriteHeader(http.StatusInternalServerError) //todo
+		response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	vars := mux.Vars(request)
@@ -142,11 +156,25 @@ func Delete(response http.ResponseWriter, request *http.Request) {
 		response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	sqlQuery := `update notes set active = false where id = ?`
-	err = db.Exec(sqlQuery, id).Error
+	var check models.Notes
+	sqlQuery := `select * from notes where id = ? and active = true`
+	err = db.Raw(sqlQuery, id).Scan(&check).Error
+	log.Println(check)
 	if err != nil {
 		log.Println(err)
-		response.WriteHeader(http.StatusInternalServerError) //todo
+		response.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if check.Content == "" {
+		response.Write([]byte("There is not such note!"))
+		return
+	}
+	response.Write([]byte("Success"))
+	sqlQuery = `update notes set active = false, deleted_at = ? where id = ? and active = true`
+	err = db.Exec(sqlQuery, time.Now(), id).Error
+	if err != nil {
+		log.Println(err)
+		response.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 }
