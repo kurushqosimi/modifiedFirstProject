@@ -47,7 +47,7 @@ func Create(response http.ResponseWriter, request *http.Request) {
 	}
 	response.Write([]byte("Success"))
 }
-func Read(response http.ResponseWriter, request *http.Request) { //todo make a list of all the notes
+func Read(response http.ResponseWriter, request *http.Request) { //todo make a list of all the notes, declare global variable with db connection
 	dbUri := "host=localhost port = 5432 user = app password = pass dbname = db"
 	db, err := gorm.Open(postgres.Open(dbUri), &gorm.Config{}) //installs connection with database
 	if err != nil {
